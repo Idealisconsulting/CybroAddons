@@ -4,43 +4,25 @@ from datetime import datetime
 from dateutil import parser
 from odoo import http, tools, _
 from odoo.http import request
+from odoo.addons.website_sale.controllers.main import WebsiteSale
 
 
-class WebsiteCoupon(http.Controller):
-
-    @http.route(['/shop/cart'], type='http', auth="public", website=True)
+class WebsiteCoupon(WebsiteSale):
+    @http.route()
     def cart(self, **post):
         """This function is overwritten because we need to pass the value 'coupon_not_available'
-        to the template, inorder to show the error message to the user that, 'this coupon is not available'. """
-
-        order = request.website.sale_get_order()
-        if order:
-            from_currency = order.company_id.currency_id
-            to_currency = order.pricelist_id.currency_id
-            compute_currency = lambda price: from_currency.compute(price, to_currency)
-        else:
-            compute_currency = lambda price: price
-
-        values = {
-            'website_sale_order': order,
-            'compute_currency': compute_currency,
-            'suggested_products': [],
-        }
-        if order:
-            _order = order
-            if not request.env.context.get('pricelist'):
-                _order = order.with_context(pricelist=order.pricelist_id.id)
-            values['suggested_products'] = _order._cart_accessories()
-
+        to the template, inorder to show the error message to the user that, 'this coupon is not available'"""
+        response = super(WebsiteCoupon, self).cart(**post)
         if post.get('type') == 'popover':
-            return request.render("website_sale.cart_popover", values)
+            response.template = 'website_sale.cart_popover'
+            return response
 
         if post.get('code_not_available'):
-            values['code_not_available'] = post.get('code_not_available')
+            response.qcontext['code_not_available'] = post.get('code_not_available')
         elif post.get('coupon_not_available'):
-            values['coupon_not_available'] = post.get('coupon_not_available')
-        return request.render("website_sale.cart", values)
-
+            response.qcontext['coupon_not_available'] = post.get('coupon_not_available')
+        return response
+        
     @http.route(['/shop/gift_coupon'], type='http', auth="public", website=True)
     def gift_coupon(self, promo_voucher, **post):
         """This function will be executed when we click the apply button of the voucher code in the website.
